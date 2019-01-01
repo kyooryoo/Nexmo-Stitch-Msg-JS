@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <style>
+        #login, #messages { width: 80%; height: 300px; }
+        #messages { display: none; }
+    </style>
+    <script src="./node_modules/nexmo-stitch/dist/conversationClient.js"></script>
+</head>
+
+<body>
+
+    <form id="login">
+        <h1>Login</h1>
+        <input type="text" name="username" value="">
+        <input type="submit" value="Login" />
+    </form>
+
+    <section id="messages">
+        <h1>Messages</h1>
+        <div id="messageFeed"></div>
+        <textarea id="messageTextarea"></textarea>
+        <br>
+        <button id="send">Send</button>
+    </section>
+
+    <script>
+        const USER_JWT = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NDYzMjI5NDAsImp0aSI6ImJiMGFjMDUwLTBkOGItMTFlOS05ZmJmLTBiOGE1NWFjZDE2MiIsInN1YiI6IkFsaWNlIiwiZXhwIjoxNTQ2NDA5MzM5LCJhY2wiOnsicGF0aHMiOnsiL3YxL3VzZXJzLyoqIjp7fSwiL3YxL2NvbnZlcnNhdGlvbnMvKioiOnt9LCIvdjEvc2Vzc2lvbnMvKioiOnt9LCIvdjEvZGV2aWNlcy8qKiI6e30sIi92MS9pbWFnZS8qKiI6e30sIi92My9tZWRpYS8qKiI6e30sIi92MS9hcHBsaWNhdGlvbnMvKioiOnt9LCIvdjEvcHVzaC8qKiI6e30sIi92MS9rbm9ja2luZy8qKiI6e319fSwiYXBwbGljYXRpb25faWQiOiJkYjM2YWJmMi1lZGY5LTRhNzMtOWRiZC0xMDkyZmUwYjYzMmYifQ.fDk88DQC6WNNvGBDkhbT2fUAwol946im_8sFPvVaXBqhq3-4nbxcw64cDEgGuTFi97AtK9_cyIFSlrxA3ZYsbMGM1d9j7nFUVMAp0d8O-T8jMlIGjAQj_lrzvXEa2xi9RlxXL0sDG1Nbb4gvzq9_Z3sR9TWvaRa9EDROwSCtbwAQF5MbyAvoaF7J_xGPAoKMDLnii2Ki3oIBu3QR2cG-v55iTdEimuD_7YlAsd4eAPzVDztqaE9pD68I530ZDRCWN8XxfQuAaYVUz5uDfIs-oHmqmFmSYD-iR67qttVUZlAYoNyqfUcdaQK8RRdnDpI6LYIW0btaTSH0j-Eluq5EBg';
+        const YOUR_CONVERSATION_ID = 'CON-a462fc56-cab4-455d-938e-bfb5ea121b3b';
+
+        class ChatApp {
+            constructor() {
+                this.messageTextarea = document.getElementById('messageTextarea')
+                this.messageFeed = document.getElementById('messageFeed')
+                this.sendButton = document.getElementById('send')
+                this.loginForm = document.getElementById('login')
+                this.setupUserEvents()
+            }
+
+            errorLogger(error) {
+                console.log(error)
+            }
+
+            eventLogger(event) {
+                return () => {
+                    console.log("'%s' event was sent", event)
+                }
+            }
+
+            authenticate() {
+                return USER_JWT
+            }
+
+            setupConversationEvents(conversation) {
+                this.conversation = conversation
+                console.log('*** Conversation Retrieved', conversation)
+                console.log('*** Conversation Member', conversation.me)
+
+                // Bind to events on the conversation, which will be in standby mode
+                // when new message comes, new line of text is composed and showed
+                conversation.on('text', (sender, message) => {
+                    console.log('*** Message received', sender, message)
+                    const date = new Date(Date.parse(message.timestamp))
+                    const text = `${sender.user.name} @ ${date}: <b>${message.body.text}</b><br>`
+                    this.messageFeed.innerHTML = text + this.messageFeed.innerHTML
+                })
+            }
+
+            // this function is called at the end of setupUserEvents()
+            // create a ConversationClient instance with the passed in user JWT
+            // get the conversation and pass it to setupConversationEvents()
+            joinConversation(userToken) {
+                new ConversationClient({
+                        debug: false
+                    })
+                    .login(userToken)
+                    .then(app => {
+                        console.log('*** Logged into app', app)
+                        return app.getConversation(YOUR_CONVERSATION_ID)
+                    })
+                    .then(this.setupConversationEvents.bind(this))
+                    .catch(this.errorLogger)
+            }
+
+            setupUserEvents() {
+                // after send button is clicked, message is sent by the conversation client
+                // then message input text area is cleared and ready for new input
+                this.sendButton.addEventListener('click', () => {
+                    this.conversation.sendText(this.messageTextarea.value).then(() => {
+                        this.eventLogger('text')()
+                        this.messageTextarea.value = ''
+                    }).catch(this.errorLogger)
+                })
+
+                // user clicks the login button on the first page and submit the form
+                // it takes the user token and pass it to joinConversation()
+                // at the same time, it hids the login form and shows the messages section
+                this.loginForm.addEventListener('submit', (event) => {
+                    event.preventDefault()
+                    const userToken = this.authenticate()
+                    if (userToken) {
+                        document.getElementById('messages').style.display = 'block'
+                        document.getElementById('login').style.display = 'none'
+                        this.joinConversation(userToken)
+                    }
+                })
+            }
+        }
+
+        new ChatApp()
+    </script>
+</body>
+
+</html>
